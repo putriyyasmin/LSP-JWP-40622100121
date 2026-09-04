@@ -31,7 +31,26 @@ if (isset($_POST['tambah'])) {
     exit;
 }
 
-// 2. UBAH STATUS TUGAS (UPDATE) - dipicu oleh checkbox
+// 2. EDIT JUDUL TUGAS (UPDATE) - dipicu oleh form modal edit
+if (isset($_POST['edit'])) {
+    $idTugas   = (int) $_POST['id'];
+    $judulBaru = trim($_POST['title']);
+
+    if ($judulBaru !== '') {
+        foreach ($_SESSION['todos'] as &$tugas) {
+            if ($tugas['id'] === $idTugas) {
+                $tugas['title'] = $judulBaru;
+                break;
+            }
+        }
+        unset($tugas);
+    }
+
+    header('Location: index.php');
+    exit;
+}
+
+// 3. UBAH STATUS TUGAS (UPDATE) - dipicu oleh checkbox
 if (isset($_GET['update'])) {
     $idTugas = (int) $_GET['id'];
 
@@ -47,7 +66,7 @@ if (isset($_GET['update'])) {
     exit;
 }
 
-// 3. HAPUS TUGAS (DELETE)
+// 4. HAPUS TUGAS (DELETE)
 if (isset($_GET['hapus'])) {
     $idTugas = (int) $_GET['hapus'];
 
@@ -60,7 +79,7 @@ if (isset($_GET['hapus'])) {
     exit;
 }
 
-// 4. BACA DATA (READ)
+// 5. BACA DATA (READ)
 $daftarTugas = $_SESSION['todos'];
 ?>
 <!DOCTYPE html>
@@ -137,6 +156,18 @@ $daftarTugas = $_SESSION['todos'];
                                         onchange="window.location.href='?update=1&id=<?= $tugas['id'] ?>'"
                                     >
 
+                                    <!-- Ikon untuk mengubah judul tugas -->
+                                    <a
+                                        href="#"
+                                        class="btn btn-sm btn-outline-primary"
+                                        title="Edit tugas"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#editModal"
+                                        onclick="isiFormEdit('<?= $tugas['id'] ?>', '<?= htmlspecialchars(addslashes($tugas['title'])) ?>')"
+                                    >
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+
                                     <!-- Simbol (ikon) untuk menghapus tugas -->
                                     <a
                                         href="?hapus=<?= $tugas['id'] ?>"
@@ -157,5 +188,40 @@ $daftarTugas = $_SESSION['todos'];
     </div>
 
 </div>
+
+<!-- Modal Edit Tugas -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Tugas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" name="id" id="editId">
+                <label class="form-label">Judul Tugas</label>
+                <input
+                    type="text"
+                    name="title"
+                    id="editTitle"
+                    class="form-control"
+                    required
+                >
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" name="edit" class="btn btn-primary">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function isiFormEdit(id, title) {
+        document.getElementById('editId').value = id;
+        document.getElementById('editTitle').value = title;
+    }
+</script>
 </body>
 </html>
