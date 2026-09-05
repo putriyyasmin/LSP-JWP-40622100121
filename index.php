@@ -1,11 +1,9 @@
 <?php
+
+// Sesion & Inisialisasi
 session_start();
-if (isset($_GET['reset'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-// Inisialisasi struktur data array of objects (sesuai instruksi soal)
+
+// Inisialisasi struktur data array
 if (!isset($_SESSION['todos'])) {
     $_SESSION['todos'] = [
         ['id' => 1, 'title' => 'Belajar PHP', 'status' => 'belum'],
@@ -14,73 +12,146 @@ if (!isset($_SESSION['todos'])) {
     $_SESSION['next_id'] = 3;
 }
 
-// 1. TAMBAH TUGAS (CREATE)
-if (isset($_POST['tambah'])) {
-    $judulTugas = trim($_POST['title']);
+// FUNGSI HELPER 
 
-    if ($judulTugas !== '') {
-        $_SESSION['todos'][] = [
-            'id'     => $_SESSION['next_id'],
-            'title'  => $judulTugas,
-            'status' => 'belum',
-        ];
-        $_SESSION['next_id']++;
-    }
-
-    header('Location: index.php');
-    exit;
-}
-
-// 2. EDIT JUDUL TUGAS (UPDATE) - dipicu oleh form modal edit
-if (isset($_POST['edit'])) {
-    $idTugas   = (int) $_POST['id'];
-    $judulBaru = trim($_POST['title']);
-
-    if ($judulBaru !== '') {
-        foreach ($_SESSION['todos'] as &$tugas) {
-            if ($tugas['id'] === $idTugas) {
-                $tugas['title'] = $judulBaru;
-                break;
-            }
-        }
-        unset($tugas);
-    }
-
-    header('Location: index.php');
-    exit;
-}
-
-// 3. UBAH STATUS TUGAS (UPDATE) - dipicu oleh checkbox
-if (isset($_GET['update'])) {
-    $idTugas = (int) $_GET['id'];
-
-    foreach ($_SESSION['todos'] as &$tugas) {
-        if ($tugas['id'] === $idTugas) {
-            $tugas['status'] = ($tugas['status'] === 'selesai') ? 'belum' : 'selesai';
-            break;
+/**
+ * Helper: mencari POSISI (index) tugas di dalam array $_SESSION['todos']
+ * berdasarkan ID-nya.
+ *
+ * Fungsi ini dipakai bersama oleh editTugas() dan toggleStatusTugas(),
+ * supaya logika "cari tugas berdasarkan ID" tidak ditulis berulang-ulang
+ * di banyak tempat.
+ *
+ * Mengembalikan index (int) jika ditemukan, atau null jika tidak ada
+ * tugas dengan ID tersebut.
+ */
+function cariIndexTugas(int $id): ?int
+{
+    foreach ($_SESSION['todos'] as $index => $tugas) {
+        if ($tugas['id'] === $id) {
+            return $index;
         }
     }
-    unset($tugas);
+    return null;
+}
 
+/**
+ * Helper: redirect kembali ke index.php lalu hentikan eksekusi.
+ *
+ * Dipakai di semua blok routing (tambah/edit/update/hapus) yang tadinya
+ * masing-masing menulis "header('Location: index.php'); exit;" sendiri-sendiri.
+ * Pola ini disebut PRG (Post/Redirect/Get) - mencegah data terkirim ulang
+ * saat user menekan tombol refresh pada browser.
+ */
+function redirectKeIndex(): void
+{
     header('Location: index.php');
     exit;
 }
 
-// 4. HAPUS TUGAS (DELETE)
-if (isset($_GET['hapus'])) {
-    $idTugas = (int) $_GET['hapus'];
+// FUNGSI LOGIKA CRUD 
 
+/**
+ * CREATE - Menambahkan tugas baru ke dalam session.
+ * Judul kosong (setelah di-trim) akan diabaikan, tidak jadi ditambahkan.
+ */
+function tambahTugas(string $title): void
+{
+    $title = trim($title);
+    if ($title === '') {
+        return;
+    }
+
+    $_SESSION['todos'][] = [
+        'id'     => $_SESSION['next_id'],
+        'title'  => $title,
+        'status' => 'belum',
+    ];
+    $_SESSION['next_id']++;
+}
+
+/**
+ * UPDATE - Mengubah judul tugas berdasarkan ID.
+ * Menggunakan cariIndexTugas() untuk menemukan posisi tugas,
+ * lalu langsung mengubah nilainya lewat index (tanpa reference/&).
+ */
+function editTugas(int $id, string $title): void
+{
+    $title = trim($title);
+    if ($title === '') {
+        return;
+    }
+
+    $index = cariIndexTugas($id);
+    if ($index !== null) {
+        $_SESSION['todos'][$index]['title'] = $title;
+    }
+}
+
+/**
+ * UPDATE - Toggle status tugas: selesai <-> belum.
+ * Sama seperti editTugas(), memakai cariIndexTugas() agar tidak
+ * menduplikasi logika pencarian tugas berdasarkan ID.
+ */
+function toggleStatusTugas(int $id): void
+{
+    $index = cariIndexTugas($id);
+    if ($index !== null) {
+        $statusSekarang = $_SESSION['todos'][$index]['status'];
+        $_SESSION['todos'][$index]['status'] = ($statusSekarang === 'selesai') ? 'belum' : 'selesai';
+    }
+}
+
+/**
+ * DELETE - Menghapus tugas berdasarkan ID.
+ * array_filter() membuang item yang cocok, lalu array_values()
+ * dipakai untuk merapikan ulang index array (0,1,2,...) karena
+ * array_filter() tidak melakukan reindex otomatis.
+ */
+function hapusTugas(int $id): void
+{
     $_SESSION['todos'] = array_values(array_filter(
         $_SESSION['todos'],
-        fn($tugas) => $tugas['id'] !== $idTugas
+        fn($tugas) => $tugas['id'] !== $id
     ));
-
-    header('Location: index.php');
-    exit;
 }
 
-// 5. BACA DATA (READ)
-$daftarTugas = $_SESSION['todos'];
+/**
+ * READ - Mengambil seluruh daftar tugas dari session untuk ditampilkan.
+ */
+function ambilSemuaTugas(): array
+{
+    return $_SESSION['todos'];
+}
+
+// MEMANGGILAN FUNGSI
+
+// 1. TAMBAH TUGAS
+if (isset($_POST['tambah'])) {
+    tambahTugas($_POST['title']);
+    redirectKeIndex();
+}
+
+// 2. EDIT JUDUL TUGAS
+if (isset($_POST['edit'])) {
+    editTugas((int) $_POST['id'], $_POST['title']);
+    redirectKeIndex();
+}
+
+// 3. UBAH STATUS TUGAS
+if (isset($_GET['update'])) {
+    toggleStatusTugas((int) $_GET['id']);
+    redirectKeIndex();
+}
+
+// 4. HAPUS TUGAS
+if (isset($_GET['hapus'])) {
+    hapusTugas((int) $_GET['hapus']);
+    redirectKeIndex();
+}
+
+// 5. BACA DATA (untuk ditampilkan di HTML)
+$daftarTugas = ambilSemuaTugas();
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -168,7 +239,7 @@ $daftarTugas = $_SESSION['todos'];
                                         <i class="bi bi-pencil"></i>
                                     </a>
 
-                                    <!-- Simbol (ikon) untuk menghapus tugas -->
+                                    <!-- Ikon untuk menghapus tugas -->
                                     <a
                                         href="?hapus=<?= $tugas['id'] ?>"
                                         class="btn btn-sm btn-outline-danger"
@@ -199,7 +270,7 @@ $daftarTugas = $_SESSION['todos'];
             </div>
             <div class="modal-body">
                 <input type="hidden" name="id" id="editId">
-                <label class="form-label">Judul Tugas</label>
+                <label for="editTitle" class="form-label">Judul Tugas</label>
                 <input
                     type="text"
                     name="title"
